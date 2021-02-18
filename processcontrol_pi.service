@@ -1,0 +1,12 @@
+[Unit]
+Description=Runs program to view and run commands.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /mnt/Sync/Sync/Projects/processControl/processControl_pi.py Pi Living_Room
+WorkingDirectory=/mnt/Sync/Sync/Projects/processControl
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
