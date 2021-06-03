@@ -32,7 +32,6 @@ class Remote():
             name = button[2]
             protocol = button[1]
             code = button[0]
-            #print("Name is {} protocol is {} code is {}".format(name,protocol, code))
             b = Button(name, protocol, code)
             self.buttonList.append(b)
 
@@ -40,11 +39,16 @@ class Remote():
         for b in self.buttonList:
             if b.name == buttonName:
                 button = b
-
         command = 'sudo ir-ctl --scancode {}:{}'.format(button.protocol, button.code)
         print("Command is {}".format(command))
         try:
-            subprocess.check_output(['sudo', 'ir-ctl', '--scancode', '{}:{}'.format(button.protocol, button.code)])
+            if button.protocol is not None:
+                subprocess.check_output(['sudo', 'ir-ctl', '--scancode', '{}:{}'.format(button.protocol, button.code)])
+            else:
+                f = open('temp.txt','w')
+                f.write(button.code)
+                f.close()
+                subprocess.check_output(['sudo', 'ir-ctl', '-s', 'temp.txt'])
         except Exception as e:
             #print("Failed to send command {}".format(command))
             print(e)
