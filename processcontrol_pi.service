@@ -3,8 +3,8 @@ Description=Runs program to view and run commands.
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /mnt/Sync/Sync/Projects/processControl/processControl_pi.py Pi Living_Room
-WorkingDirectory=/mnt/Sync/Sync/Projects/processControl
+ExecStart=/usr/bin/python3 /home/derek/processControl/processControl_pi.py Pi Living_Room
+WorkingDirectory=/home/derek/processControl
 Restart=always
 RestartSec=3
 
