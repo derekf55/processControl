@@ -7,6 +7,7 @@ import subprocess,time
 import random, os, sys
 import derek_functions as df
 from remote import *
+from gtts import gTTS 
 
 # Global variables 
 DEVICE_NAME = ''
@@ -50,6 +51,18 @@ def runCommand(commandList):
             subprocess.check_output(['omxplayer','-o','local',random_quote()])
             removeCompleted()
             continue
+        if command == 'tts':
+            sql = "SELECT TTS, ID FROM `SoundQueue` order by id "
+            playbackText, ID = df.runSql(sql)[0]
+            language = 'en'
+            soundObject = gTTS(text=playbackText, lang=language, slow=False)
+            soundObject.save("output.mp3")
+            subprocess.check_output(['omxplayer','-o','local','output.mp3'])
+            sql = f"DELETE FROM `SoundQueue` WHERE ID = {ID}"
+            df.runSql(sql)
+            removeCompleted()
+            continue
+
         try:
             remote.pushButton(command)
         except Exception as e:
