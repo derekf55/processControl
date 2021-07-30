@@ -85,6 +85,8 @@ def runCommand(commandList):
             generatePhoneTTS(getPeopleHere())
             subprocess.check_output(['ffmpeg','-i',PHONE_INPUT_FILE,'-ac','1','-ar','8000',df.PHONE_OUTPUT_FILE])
             df.sendToPhone()
+            os.remove(PHONE_INPUT_FILE)
+            os.remove(df.PHONE_OUTPUT_FILE)
     
 
         try:
