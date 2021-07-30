@@ -8,11 +8,13 @@ import random, os, sys
 import derek_functions as df
 from remote import *
 from gtts import gTTS 
+import pysftp
 
 # Global variables 
 DEVICE_NAME = ''
 ROOM_NAME = ''
 QUOTE_PATH = '/mnt/pi/DONNY_MP3_FILES/'
+PHONE_INPUT_FILE = 'PresenceDetection.mp3'
 
 
 #Gets the oldest command in the queue 
@@ -30,8 +32,6 @@ def fetchCommand():
         #print("Processing command {}".format(command))
         commands.append(command[0])
         #print("Appending {} to commands".format(command[0]))
-
-    
     return commands
 
 #@param conn, cursor: Takes the current connection object and cursor object
@@ -39,6 +39,24 @@ def fetchCommand():
 def removeCompleted():
     sql = "DELETE FROM `ProcessToRun` WHERE Server='{}' ORDER BY id ASC LIMIT 1".format(DEVICE_NAME)
     df.runSql(sql)
+
+def getPeopleHere():
+    sql = 'SELECT Name FROM `PeopleHere` ORDER by Resident, Name'
+    results = df.runSql(sql)
+    people = []
+    for item in results:
+        people.append(item[0])
+    return people
+
+def generatePhoneTTS(people):
+    language = 'en'
+    stringToRead = "People that are currently here.  "
+    for person in people:
+        stringToRead += f"{person}, "
+
+    soundObject = gTTS(text=stringToRead, lang=language, slow=False)
+    soundObject.save(PHONE_INPUT_FILE)
+
 
 #@param conn, cursor: Takes the current connection object and cursor object 
 #Runs one of the listed commands
@@ -62,6 +80,11 @@ def runCommand(commandList):
             df.runSql(sql)
             removeCompleted()
             continue
+
+        if command == 'Presence_Phone':
+            generatePhoneTTS(getPeopleHere())
+            subprocess.check_output(['ffmpeg','-i',PHONE_INPUT_FILE,'-ac','1','-ar','8000',df.PHONE_OUTPUT_FILE])
+            df.sendToPhone()
 
         try:
             remote.pushButton(command)
