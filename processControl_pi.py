@@ -2,6 +2,7 @@
 #Last updated 2/6/21
 #Program runs on the raspberry pi and checks the servers database for commands then runs them
 #!/usr/bin/env python3
+from gtts.tokenizer.tokenizer_cases import other_punctuation
 import mysql.connector 
 import subprocess,time
 import random, os, sys
@@ -14,7 +15,7 @@ import pysftp
 DEVICE_NAME = ''
 ROOM_NAME = ''
 QUOTE_PATH = '/mnt/pi/DONNY_MP3_FILES/'
-PHONE_INPUT_FILE = 'PresenceDetection.mp3'
+
 
 
 #Gets the oldest command in the queue 
@@ -22,7 +23,7 @@ PHONE_INPUT_FILE = 'PresenceDetection.mp3'
 #@returns the command from the database
 def fetchCommand():
     #sql = "SELECT command FROM `ProcessToRun` WHERE Server='{}' HAVING MAX(id) ".format(DEVICE_NAME)
-    sql = "SELECT Command FROM ProcessToRun WHERE Server = '{}' ORDER BY ID".format(DEVICE_NAME)
+    sql = f"SELECT Command, args FROM ProcessToRun WHERE Server = '{DEVICE_NAME}' ORDER BY ID"
     querry_results = df.runSql(sql)
     commands = []
     if len(querry_results) == 0:
@@ -30,14 +31,20 @@ def fetchCommand():
 
     for command in querry_results:
         #print("Processing command {}".format(command))
-        commands.append(command[0])
+        d = {}
+        d['Command'] = command[0]
+        try:
+            d['Args'] = command[1]
+        except Exception as e:
+            pass
+        commands.append(d)
         #print("Appending {} to commands".format(command[0]))
     return commands
 
 #@param conn, cursor: Takes the current connection object and cursor object
 #Removes the last command 
 def removeCompleted():
-    sql = "DELETE FROM `ProcessToRun` WHERE Server='{}' ORDER BY id ASC LIMIT 1".format(DEVICE_NAME)
+    sql = f"DELETE FROM `ProcessToRun` WHERE Server='{DEVICE_NAME}' ORDER BY id ASC LIMIT 1"
     df.runSql(sql)
 
 def getPeopleHere():
@@ -48,14 +55,10 @@ def getPeopleHere():
         people.append(item[0])
     return people
 
-def generatePhoneTTS(people):
+def generateTTS(text,outputFile):
     language = 'en'
-    stringToRead = "People that are currently here.  "
-    for person in people:
-        stringToRead += f"{person}, "
-
-    soundObject = gTTS(text=stringToRead, lang=language, slow=False)
-    soundObject.save(PHONE_INPUT_FILE)
+    soundObject = gTTS(text=text, lang=language, slow=False)
+    soundObject.save(outputFile)
 
 
 #@param conn, cursor: Takes the current connection object and cursor object 
@@ -63,7 +66,12 @@ def generatePhoneTTS(people):
 def runCommand(commandList):
     if len(commandList) == 0:
         print("No commands")
-    for command in commandList:
+    for commandDict in commandList:
+        command = commandDict['Command']
+        try:
+            args = commandDict['Args']
+        except Exception as e:
+            pass
         print("Running {}".format(command))
         if command == 'Donny':
             subprocess.check_output(['omxplayer','-o','local',random_quote()])
@@ -72,9 +80,7 @@ def runCommand(commandList):
         if command == 'tts':
             sql = "SELECT TTS, ID FROM `SoundQueue` order by id "
             playbackText, ID = df.runSql(sql)[0]
-            language = 'en'
-            soundObject = gTTS(text=playbackText, lang=language, slow=False)
-            soundObject.save("output.mp3")
+            generateTTS(playbackText,'output.mp3')
             subprocess.check_output(['omxplayer','-o','local','output.mp3'])
             sql = f"DELETE FROM `SoundQueue` WHERE ID = {ID}"
             df.runSql(sql)
@@ -82,12 +88,55 @@ def runCommand(commandList):
             continue
     
         if command == 'Presence_Phone':
-            generatePhoneTTS(getPeopleHere())
-            subprocess.check_output(['ffmpeg','-i',PHONE_INPUT_FILE,'-ac','1','-ar','8000',df.PHONE_OUTPUT_FILE])
-            df.sendToPhone()
-            os.remove(PHONE_INPUT_FILE)
-            os.remove(df.PHONE_OUTPUT_FILE)
-    
+            people = getPeopleHere()
+            mp3File = 'PresenceDetection.mp3'
+            wavFile = 'PresenceDetection.wav'
+            stringToRead = "People that are currently here.  "
+            for person in people:
+                stringToRead += f"{person}, "
+            generateTTS(stringToRead,mp3File)
+            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile])
+            df.sendToPhone(wavFile,f'/var/lib/asterisk/sounds/en/custom/{wavFile}')
+            os.remove(mp3File)
+            os.remove(wavFile)
+
+        if command == "personArrival":
+            text = f"{args} has just arrived"
+            mp3File = 'newArrival.mp3'
+            wavFile = 'msg0000.wav'
+            generateTTS(text,mp3File)
+            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile])
+            voiceText = """;
+                        ; Message Information file
+                        ;
+                        [message]
+                        origmailbox=100
+                        context=macro-vm
+                        macrocontext=ext-local
+                        exten=s-NOANSWER
+                        rdnis=unknown
+                        priority=2
+                        callerchan=PJSIP/300-0000006d
+                        callerid="Alaska" <300>
+                        origdate=Fri Jul 30 05:59:11 PM UTC 2021
+                        origtime=1627667951
+                        category=
+                        msg_id=1627667951-00000002
+                        flag=
+                        duration=1
+                        """
+            textFile = 'msg0000.txt'
+            f = open(textFile,'w')
+            f.write(voiceText)
+            f.close()
+            df.sendToPhone(wavFile,f'/var/spool/asterisk/voicemail/default/100/INBOX/{wavFile}')
+            df.sendToPhone(textFile,f'/var/spool/asterisk/voicemail/default/100/INBOX/{textFile}')
+            os.remove(mp3File)
+            os.remove(wavFile)
+            
+
+
+
 
         try:
             remote.pushButton(command)
