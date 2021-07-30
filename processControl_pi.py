@@ -55,7 +55,7 @@ def generatePhoneTTS(people):
         stringToRead += f"{person}, "
 
     soundObject = gTTS(text=stringToRead, lang=language, slow=False)
-    soundObject.save(df.PHONE_OUTPUT_FILE)
+    soundObject.save(PHONE_INPUT_FILE)
 
 
 #@param conn, cursor: Takes the current connection object and cursor object 
