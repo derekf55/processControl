@@ -80,13 +80,12 @@ def runCommand(commandList):
             df.runSql(sql)
             removeCompleted()
             continue
-        try:
-            if command == 'Presence_Phone':
-                generatePhoneTTS(getPeopleHere())
-                subprocess.check_output(['ffmpeg','-i',PHONE_INPUT_FILE,'-ac','1','-ar','8000',df.PHONE_OUTPUT_FILE])
-                df.sendToPhone()
-        except Exception as e:
-            print(e)
+    
+        if command == 'Presence_Phone':
+            generatePhoneTTS(getPeopleHere())
+            subprocess.check_output(['ffmpeg','-i',PHONE_INPUT_FILE,'-ac','1','-ar','8000',df.PHONE_OUTPUT_FILE])
+            df.sendToPhone()
+    
 
         try:
             remote.pushButton(command)
