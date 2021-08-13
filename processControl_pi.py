@@ -95,7 +95,7 @@ def runCommand(commandList):
             for person in people:
                 stringToRead += f"{person}, "
             generateTTS(stringToRead,mp3File)
-            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile])
+            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile,'-y'])
             df.sendToPhone(wavFile,f'/var/lib/asterisk/sounds/en/custom/{wavFile}')
             os.remove(mp3File)
             os.remove(wavFile)
