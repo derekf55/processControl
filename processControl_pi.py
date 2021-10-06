@@ -10,6 +10,9 @@ import derek_functions as df
 from remote import *
 from gtts import gTTS 
 import pysftp
+from requests.api import post, get
+import json
+import datetime
 
 # Global variables 
 DEVICE_NAME = ''
@@ -78,12 +81,24 @@ def runCommand(commandList):
             removeCompleted()
             continue
         if command == 'tts':
-            sql = "SELECT TTS, ID FROM `SoundQueue` order by id "
-            playbackText, ID = df.runSql(sql)[0]
-            generateTTS(playbackText,'output.mp3')
-            subprocess.check_output(['omxplayer','-o','local','output.mp3'])
-            sql = f"DELETE FROM `SoundQueue` WHERE ID = {ID}"
+            sql = "SELECT TTS, ID, Speaker FROM `SoundQueue` order by id "
+            playbackText, ID, speaker = df.runSql(sql)[0]
+            url = "https://derekfranz.ddns.net:8542/api/services/tts/google_say"
+            headers = df.HOME_ASSISTANT_HEADERS
+
+            if speaker == "Derek's Room":
+                speaker = "media_player.dereks_room_speaker"
+            elif speaker == "Living Room":
+                speaker = "media_player.living_room_tv"
+            elif speaker == "Sam's Room":
+                speaker = "media_player.sams_room_speaker"
+
+            data = {"entity_id": speaker, 'message': playbackText, 'cache': 'true'}
+            response = post(url, headers=headers, verify=False, json=data)
+
+            sql = f"DELETE FROM SoundQueue WHERE ID = {ID}"
             df.runSql(sql)
+
             removeCompleted()
             continue
     
@@ -99,14 +114,29 @@ def runCommand(commandList):
             df.sendToPhone(wavFile,f'/var/lib/asterisk/sounds/en/custom/{wavFile}')
             os.remove(mp3File)
             os.remove(wavFile)
+            df.delete_old_voicemails()
 
         if command == "personArrival":
+            # if args in current_voicemails:
+            #     removeCompleted()
+            #     return
             text = f"{args} has just arrived"
             mp3File = 'newArrival.mp3'
-            wavFile = 'msg0000.wav'
+            current_num_voicemails = df.get_num_voicemails()
+            required_digits = 4 - len(str(current_num_voicemails))
+            wavFile = 'msg'
+            textFile = 'msg'
+            while required_digits > 0:
+                wavFile += '0'
+                textFile += '0'
+                required_digits -=1
+            wavFile += f'{current_num_voicemails}.wav'
+            textFile += f'{current_num_voicemails}.txt'
+                        
             generateTTS(text,mp3File)
-            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile])
-            voiceText = """;
+            subprocess.check_output(['ffmpeg','-i',mp3File,'-ac','1','-ar','8000',wavFile,'-y'])
+            # origdate=Fri Jul 30 05:59:11 PM UTC 2021
+            voiceText = f""";
                         ; Message Information file
                         ;
                         [message]
@@ -118,14 +148,15 @@ def runCommand(commandList):
                         priority=2
                         callerchan=PJSIP/300-0000006d
                         callerid="Alaska" <300>
-                        origdate=Fri Jul 30 05:59:11 PM UTC 2021
+                        origdate={datetime.datetime.now()}
                         origtime=1627667951
                         category=
                         msg_id=1627667951-00000002
-                        flag=
+                        flag={args}
                         duration=1
                         """
-            textFile = 'msg0000.txt'
+            
+            #textFile = f'msg{current_num_voicemails}.txt'
             f = open(textFile,'w')
             f.write(voiceText)
             f.close()
@@ -133,8 +164,42 @@ def runCommand(commandList):
             df.sendToPhone(textFile,f'/var/spool/asterisk/voicemail/default/100/INBOX/{textFile}')
             os.remove(mp3File)
             os.remove(wavFile)
+            df.delete_old_voicemails()
+            df.remove_duplicate_voicemails()
             
+            
+        
+        if command == 'switch_light':
+            devices = [args]
+            if args == 'all':
+                devices = ['desk_lamp','christmas_lights']
+            
+            for device in devices:
 
+                # Get state 
+                url = f"https://derekfranz.ddns.net:8542/api/states/light.{device}"
+                
+                headers = df.HOME_ASSISTANT_HEADERS
+                response = get(url,headers=headers,verify=False)
+                jsonData = json.loads(response.text)
+
+                current_state = jsonData['state']
+
+                if current_state == 'on':
+                    new_state = 'off'
+                else:
+                    new_state = 'on'
+
+                url = f"https://derekfranz.ddns.net:8542/api/services/light/turn_{new_state}"
+                headers = {
+                    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiI4N2Q4MmVkZTY2MGQ0YjRmODQ1MGJhYzBiMThmODI5ZSIsImlhdCI6MTYyOTMyMTg3NCwiZXhwIjoxOTQ0NjgxODc0fQ.U7uUt796gnljzxFq_dvAl7Y8dutbdpsmoOyqvTJhGoU",
+                    "content-type": "application/json",
+                }
+                
+                service_data = {"entity_id":f"light.{device}"}
+                check = post(url,headers=headers,json=service_data,verify=False)
+            
+                print(check)
 
 
 
@@ -160,6 +225,8 @@ def random_quote():
 
     return selectedQuotePath
 
+
+
 #Tries to connect to the server and if the connection is closed reconnect
 def main():
     global DEVICE_NAME
@@ -174,6 +241,8 @@ def main():
     ROOM_NAME = sys.argv[2]
 
     remote = Remote(room=ROOM_NAME)
+
+    #runCommand(fetchCommand())
 
     try:
         while True:
