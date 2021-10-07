@@ -191,10 +191,7 @@ def runCommand(commandList):
                     new_state = 'on'
 
                 url = f"https://derekfranz.ddns.net:8542/api/services/light/turn_{new_state}"
-                headers = {
-                    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiI4N2Q4MmVkZTY2MGQ0YjRmODQ1MGJhYzBiMThmODI5ZSIsImlhdCI6MTYyOTMyMTg3NCwiZXhwIjoxOTQ0NjgxODc0fQ.U7uUt796gnljzxFq_dvAl7Y8dutbdpsmoOyqvTJhGoU",
-                    "content-type": "application/json",
-                }
+                headers = df.HOME_ASSISTANT_HEADERS
                 
                 service_data = {"entity_id":f"light.{device}"}
                 check = post(url,headers=headers,json=service_data,verify=False)
