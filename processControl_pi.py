@@ -88,8 +88,8 @@ def runCommand(commandList):
 
             if speaker == "Derek's Room":
                 speaker = "media_player.dereks_room_speaker"
-            elif speaker == "Living Room":
-                speaker = "media_player.living_room_tv"
+            elif speaker == "Living Room ":
+                speaker = "media_player.living_room_speaker"
             elif speaker == "Sam's Room":
                 speaker = "media_player.sams_room_speaker"
 
@@ -172,7 +172,7 @@ def runCommand(commandList):
         if command == 'switch_light':
             devices = [args]
             if args == 'all':
-                devices = ['desk_lamp','christmas_lights']
+                devices = ['derektemp_dereksroom','christmaslights_dereksroom']
             
             for device in devices:
 
